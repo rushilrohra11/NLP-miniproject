@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clinical NLP System</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Clinical NLP System</p>
+      <h1>Audio or Text to Clinical Notes</h1>
+      <p class="lede">Upload an audio file or enter clinical text to generate a transcription, summary, and SOAP note using Google Gemini AI.</p>
+    </section>
+
+    <section class="card panel-grid">
+      <div class="panel panel-upload">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Step 1</p>
+            <h2>Choose Input</h2>
+          </div>
+          <p class="panel-hint">Audio (WAV, MP3, etc.) or Text</p>
+        </div>
+
+        <div class="input-tabs">
+          <button class="tab-btn active" data-tab="audio">Upload Audio</button>
+          <button class="tab-btn" data-tab="text">Enter Text</button>
+        </div>
+
+        <div id="audio-tab" class="tab-content active">
+          <label class="file-input" for="audioFile">
+            <span class="file-input-label">Choose audio file</span>
+            <span id="fileName" class="file-input-name">No file selected</span>
+          </label>
+          <input id="audioFile" type="file" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg" hidden />
+          <p class="tab-hint">Supported: WAV, MP3, M4A, FLAC, OGG</p>
+        </div>
+
+        <div id="text-tab" class="tab-content">
+          <textarea id="clinicalText" class="text-input" placeholder="Enter clinical text here. Example: Patient reports fever and cough for two days..." rows="6"></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="generateBtn" type="button">
+            <span class="btn-text">Generate Medical Notes</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div id="errorBox" class="alert alert-error" role="alert" aria-live="polite" hidden></div>
+        <div id="statusBox" class="status" aria-live="polite">Ready to process audio or text.</div>
+      </div>
+
+      <div class="panel panel-results">
+        <div class="panel-header">
+          <div>
+            <p class="panel-kicker">Step 2</p>
+            <h2>Generated Results</h2>
+          </div>
+          <p class="panel-hint">Transcription, summary, and SOAP note</p>
+        </div>
+
+        <div class="results">
+          <section class="result-block" id="transcription-block">
+            <h3>Transcription</h3>
+            <pre id="transcription" class="output">No transcription yet.</pre>
+          </section>
+
+          <section class="result-block">
+            <h3>Summary</h3>
+            <pre id="summary" class="output">No summary yet.</pre>
+          </section>
+
+          <section class="result-block result-block-wide">
+            <h3>SOAP Note</h3>
+            <div id="soapNote" class="soap-output">No SOAP note yet.</div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

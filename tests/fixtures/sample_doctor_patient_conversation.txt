@@ -1,0 +1,9 @@
+Doctor: What brings you in today?
+Patient: I've had a headache and fever for two days.
+Doctor: Any cough, chest pain, or shortness of breath?
+Patient: No cough or chest pain, but I feel tired and nauseous.
+Doctor: Are you taking any medications?
+Patient: I took ibuprofen and acetaminophen.
+Doctor: Any history of hypertension or diabetes?
+Patient: I have hypertension.
+Doctor: Your vitals are stable, but we should monitor the fever and continue treatment.

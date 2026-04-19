@@ -1,0 +1,21 @@
+fastapi
+uvicorn[standard]
+transformers
+torch
+datasets
+python-multipart
+nltk
+spacy
+rouge-score
+
+# Google Gemini API for audio-to-text (no FFmpeg needed!)
+google-genai
+
+# Common supporting packages for this project
+pydantic
+python-dotenv
+accelerate
+sentencepiece
+numpy
+pandas
+pytest

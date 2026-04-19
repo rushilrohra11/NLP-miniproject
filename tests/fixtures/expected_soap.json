@@ -1,0 +1,13 @@
+{
+  "SOAP": {
+    "Subjective": "Patient reports headache, fever, fatigue, and nausea.",
+    "Objective": "Vitals are stable.",
+    "Assessment": "History of hypertension.",
+    "Plan": "Monitor fever and continue treatment."
+  },
+  "ExtractedEntities": {
+    "Symptoms": ["headache", "fatigue", "nausea", "fever"],
+    "Medicines": ["ibuprofen", "acetaminophen"],
+    "Conditions": ["fever", "hypertension"]
+  }
+}
