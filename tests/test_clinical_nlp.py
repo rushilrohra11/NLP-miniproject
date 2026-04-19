@@ -48,12 +48,22 @@ def test_speech_to_text_with_sample_audio(monkeypatch: pytest.MonkeyPatch, tmp_p
     audio_path = tmp_path / "sample.wav"
     _create_sample_wav(audio_path)
 
-    class FakeModel:
-        def transcribe(self, file_path: str) -> dict[str, str]:
-            assert Path(file_path).exists()
-            return {"text": "Patient reports headache and fever. Taking ibuprofen."}
+    class FakeResponse:
+        text = "Patient reports headache and fever. Taking ibuprofen."
 
-    monkeypatch.setattr("backend.services.speech_service._get_whisper_model", lambda: FakeModel())
+    class FakeModels:
+        def generate_content(self, model: str, contents: list[object]) -> FakeResponse:
+            assert model == "gemini-2.5-flash"
+            assert contents
+            return FakeResponse()
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "test-key"
+            self.models = FakeModels()
+
+    monkeypatch.setattr("backend.services.speech_service.Client", FakeClient)
+    monkeypatch.setattr("backend.services.speech_service.settings.gemini_api_key", "test-key")
 
     transcript = speech_to_text(str(audio_path))
 

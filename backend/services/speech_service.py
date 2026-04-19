@@ -69,7 +69,7 @@ def speech_to_text(file_path: str) -> str:
         
         # Generate response with audio transcription request
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=[
                 "Please transcribe this audio file. Return only the transcribed text with no additional commentary or formatting.",
                 audio_part,
