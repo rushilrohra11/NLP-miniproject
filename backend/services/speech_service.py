@@ -71,7 +71,12 @@ def speech_to_text(file_path: str) -> str:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=[
-                "Please transcribe this audio file. Return only the transcribed text with no additional commentary or formatting.",
+                (
+                    "Transcribe this clinical conversation as dialogue. "
+                    "Return only transcript lines, one utterance per line, prefixed with one of: "
+                    "Doctor:, Patient:, Nurse:, Accompanier:, Support Staff:, or Other:. "
+                    "Do not add analysis or extra commentary."
+                ),
                 audio_part,
             ],
         )

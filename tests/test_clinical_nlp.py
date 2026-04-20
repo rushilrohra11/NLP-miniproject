@@ -92,6 +92,9 @@ def test_process_endpoint_returns_transcription_summary_and_soap(
     payload = response.json()
 
     assert payload["transcription"] == sample_transcript
+    assert payload["transcription_dialogue"]
     assert payload["summary"] == expected_summary
     assert payload["soap_note"]["SOAP"]["Subjective"]
     assert payload["soap_note"]["ExtractedEntities"]["Symptoms"]
+    assert "transcription_entities" in payload
+    assert "turn_count" in payload["transcription_entities"]

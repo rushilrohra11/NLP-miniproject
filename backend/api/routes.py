@@ -44,8 +44,10 @@ def process_audio(file: UploadFile = File(...)) -> ProcessResponse:
         
         return ProcessResponse(
             transcription=result["transcription"],
+            transcription_dialogue=result.get("transcription_dialogue"),
             summary=result["summary"],
             soap_note=result["soap_note"],
+            transcription_entities=result.get("transcription_entities"),
         )
     except Exception as e:
         logger.error(f"Error processing audio: {str(e)}", exc_info=True)
@@ -70,8 +72,10 @@ def process_text(text: str = Body(..., embed=True)) -> ProcessResponse:
         
         return ProcessResponse(
             transcription="",  # No transcription for text input
+            transcription_dialogue=None,
             summary=result["summary"],
             soap_note=result["soap_note"],
+            transcription_entities=None,
         )
     except Exception as e:
         logger.error(f"Error processing text: {str(e)}", exc_info=True)

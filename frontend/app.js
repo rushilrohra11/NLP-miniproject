@@ -5,7 +5,6 @@ const generateBtn = document.getElementById("generateBtn");
 const statusBox = document.getElementById("statusBox");
 const errorBox = document.getElementById("errorBox");
 const transcriptionOutput = document.getElementById("transcription");
-const transcriptionBlock = document.getElementById("transcription-block");
 const summaryOutput = document.getElementById("summary");
 const soapOutput = document.getElementById("soapNote");
 
@@ -50,6 +49,52 @@ function setOutputs(message) {
   transcriptionOutput.textContent = message;
   summaryOutput.textContent = message;
   soapOutput.innerHTML = `<div class="soap-section"><div class="soap-value">${escapeHtml(message)}</div></div>`;
+}
+
+function formatTranscriptionDisplay(transcriptionDialogue, entities) {
+  const transcript = (transcriptionDialogue || "").trim() || "No transcription returned.";
+
+  if (!entities || typeof entities !== "object") {
+    return transcript;
+  }
+
+  const roles = Array.isArray(entities.roles_detected) ? entities.roles_detected : [];
+  const doctorMentions = Array.isArray(entities.doctor_mentions) ? entities.doctor_mentions : [];
+  const patientMentions = Array.isArray(entities.patient_mentions) ? entities.patient_mentions : [];
+  const nurseMentions = Array.isArray(entities.nurse_mentions) ? entities.nurse_mentions : [];
+  const accompanierMentions = Array.isArray(entities.accompanier_mentions) ? entities.accompanier_mentions : [];
+  const supportStaffMentions = Array.isArray(entities.support_staff_mentions) ? entities.support_staff_mentions : [];
+  const turns = entities.turn_count && typeof entities.turn_count === "object" ? entities.turn_count : {};
+
+  const lines = [transcript, "", "Detected Speaker Entities:"];
+  if (roles.length > 0) {
+    lines.push(`Roles detected: ${roles.join(", ")}`);
+  } else {
+    lines.push("Roles detected: none");
+  }
+  lines.push(`Doctor turns: ${turns.doctor || 0}`);
+  lines.push(`Patient turns: ${turns.patient || 0}`);
+  lines.push(`Nurse turns: ${turns.nurse || 0}`);
+  lines.push(`Accompanier turns: ${turns.accompanier || 0}`);
+  lines.push(`Support staff turns: ${turns.support_staff || 0}`);
+  lines.push(`Other turns: ${turns.other || 0}`);
+  if (doctorMentions.length > 0) {
+    lines.push(`Doctor names: ${doctorMentions.join(", ")}`);
+  }
+  if (patientMentions.length > 0) {
+    lines.push(`Patient names: ${patientMentions.join(", ")}`);
+  }
+  if (nurseMentions.length > 0) {
+    lines.push(`Nurse names: ${nurseMentions.join(", ")}`);
+  }
+  if (accompanierMentions.length > 0) {
+    lines.push(`Accompanier names: ${accompanierMentions.join(", ")}`);
+  }
+  if (supportStaffMentions.length > 0) {
+    lines.push(`Support staff names: ${supportStaffMentions.join(", ")}`);
+  }
+
+  return lines.join("\n");
 }
 
 function escapeHtml(value) {
@@ -146,7 +191,10 @@ generateBtn.addEventListener("click", async () => {
 
       const data = await response.json();
 
-      transcriptionOutput.textContent = data.transcription || "No transcription returned.";
+      transcriptionOutput.textContent = formatTranscriptionDisplay(
+        data.transcription_dialogue || data.transcription,
+        data.transcription_entities,
+      );
       summaryOutput.textContent = data.summary || "No summary returned.";
       soapOutput.innerHTML = formatSoapNote(data.soap_note);
       setStatus("Processing complete.");
@@ -191,7 +239,7 @@ generateBtn.addEventListener("click", async () => {
 
       const data = await response.json();
 
-      transcriptionOutput.textContent = "N/A (text input)";
+      transcriptionOutput.textContent = data.transcription_dialogue || "N/A (text input)";
       summaryOutput.textContent = data.summary || "No summary returned.";
       soapOutput.innerHTML = formatSoapNote(data.soap_note);
       setStatus("Processing complete.");

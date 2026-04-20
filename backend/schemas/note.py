@@ -33,5 +33,7 @@ class SOAPResponse(BaseModel):
 
 class ProcessResponse(BaseModel):
     transcription: str
+    transcription_dialogue: str | None = None
     summary: str
     soap_note: Dict[str, Any]
+    transcription_entities: Dict[str, Any] | None = None
