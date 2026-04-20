@@ -422,9 +422,9 @@ def _concise_summary(text: str, max_sentences: int = 2) -> str:
     return _dedupe_and_clean(compact)
 
 
-def _format_section(sentences: List[str], section_name: str, predicate) -> str:
+def _format_section(sentences: List[str], section_name: str, predicate, use_fallback: bool = True) -> str:
     extracted = _extract_relevant_sentences(sentences, predicate)
-    if not extracted:
+    if not extracted and use_fallback:
         extracted = [_fallback_section(sentences, section_name)]
 
     filtered = [_dedupe_and_clean(sentence) for sentence in extracted if sentence.strip()]
@@ -441,23 +441,39 @@ def _map_to_soap(sentences: List[str], entities: Dict[str, List[str]]) -> Dict[s
     medicine_sentence = _sentence_for_entities(sentences, entities["Medicines"])
     condition_sentence = _sentence_for_entities(sentences, entities["Conditions"])
 
+    objective_sentence = ""
+    for sentence in sentences:
+        lowered = sentence.lower()
+        if _is_objective(sentence) and not any(hint in lowered for hint in PLAN_HINTS | ASSESSMENT_HINTS):
+            objective_sentence = sentence
+            break
+
+    plan_sentence = ""
+    for sentence in sentences:
+        lowered = sentence.lower()
+        if _is_plan(sentence) and not any(hint in lowered for hint in ASSESSMENT_HINTS):
+            plan_sentence = sentence
+            break
+
     subjective_parts = [
-        _format_section(sentences, "Subjective", _is_subjective),
+        _format_section(sentences, "Subjective", _is_subjective, use_fallback=True),
         _join_items(entities["Symptoms"]),
         symptom_sentence,
     ]
     objective_parts = [
-        _format_section(sentences, "Objective", _is_objective),
+        _format_section(sentences, "Objective", _is_objective, use_fallback=False),
+        objective_sentence,
         _join_items(entities["Medicines"]),
     ]
     assessment_parts = [
-        _format_section(sentences, "Assessment", _is_assessment),
+        _format_section(sentences, "Assessment", _is_assessment, use_fallback=False),
         _join_items(entities["Conditions"]),
         condition_sentence,
     ]
     plan_parts = [
-        _format_section(sentences, "Plan", _is_plan),
-        medicine_sentence,
+        _format_section(sentences, "Plan", _is_plan, use_fallback=False),
+        plan_sentence,
+        medicine_sentence if not objective_sentence else "",
         _join_items(entities["Medicines"]),
     ]
 

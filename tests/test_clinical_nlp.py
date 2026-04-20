@@ -105,3 +105,24 @@ def test_process_endpoint_returns_transcription_summary_and_soap(
     assert "turn_count" in payload["transcription_entities"]
     assert "rag_context" in payload
     assert "rag_citations" in payload
+
+
+def test_ksoap_sections_do_not_collapse_to_same_text() -> None:
+    summary = (
+        "Patient reports fever and cough for three days. "
+        "Vitals show temperature 101 F and pulse 102 bpm. "
+        "Likely viral upper respiratory infection. "
+        "Plan to continue acetaminophen, hydration, and follow up in 48 hours."
+    )
+
+    soap = generate_soap(summary)
+    ksoap = soap["KSOAP"]
+
+    objective = ksoap["Objective"].strip().lower()
+    assessment = ksoap["Assessment"].strip().lower()
+    plan = ksoap["Plan"].strip().lower()
+
+    assert objective
+    assert assessment
+    assert plan
+    assert len({objective, assessment, plan}) >= 2
