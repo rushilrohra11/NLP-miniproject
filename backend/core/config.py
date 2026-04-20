@@ -15,6 +15,7 @@ class Settings(BaseModel):
     environment: str = os.getenv("ENVIRONMENT", "development")
     hf_model_name: str = "google/flan-t5-small"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_transcription_model: str = os.getenv("GEMINI_TRANSCRIPTION_MODEL", "gemini-2.5-flash")
 
 
 settings = Settings()

@@ -1,7 +1,7 @@
 """Speech-to-text helpers built on Google Gemini API.
 
 The main entry point is `speech_to_text(file_path)`, which accepts a local audio
-file path and uses Google's Gemini API for transcription. No FFmpeg required!
+file path and uses Google's Gemini API for transcription.
 """
 
 from __future__ import annotations
@@ -43,9 +43,8 @@ def speech_to_text(file_path: str) -> str:
 
     try:
         client = Client(api_key=settings.gemini_api_key)
-        
-        logger.info(f"Processing audio file with Gemini: {file_path}")
-        
+        logger.info("Processing audio file with Gemini: %s", file_path)
+
         # Determine MIME type based on file extension
         suffix = audio_path.suffix.lower()
         mime_type_map = {
@@ -56,20 +55,17 @@ def speech_to_text(file_path: str) -> str:
             ".ogg": "audio/ogg",
         }
         mime_type = mime_type_map.get(suffix, "audio/mpeg")
-        
-        # Read audio file and create Part object
+
         with open(audio_path, "rb") as f:
             audio_data = f.read()
-        
-        # Create Part with correct structure
+
         audio_part = Part.from_bytes(
             data=audio_data,
             mime_type=mime_type,
         )
-        
-        # Generate response with audio transcription request
+
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=settings.gemini_transcription_model,
             contents=[
                 (
                     "Transcribe this clinical conversation as dialogue. "
@@ -80,12 +76,16 @@ def speech_to_text(file_path: str) -> str:
                 audio_part,
             ],
         )
-        
-        transcript = response.text.strip()
+
+        transcript = (response.text or "").strip()
+
+        if not transcript:
+            raise ValueError("Gemini transcription returned empty text.")
+
         logger.info("Transcription complete")
-        
+
         return transcript
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         logger.error(f"Audio file not found: {file_path}")
         raise
     except Exception as e:

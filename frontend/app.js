@@ -111,8 +111,18 @@ function formatSoapNote(soapNote) {
     return "No SOAP note returned.";
   }
 
-  const soap = soapNote.SOAP || soapNote;
+  const soap = soapNote.KSOAP || soapNote.SOAP || soapNote;
   const extractedEntities = soapNote.ExtractedEntities || soapNote.extracted_entities || {};
+
+  const keyDataBlock = soap.KeyData
+    ? `
+      <article class="soap-section">
+        <div class="soap-label">Key Data</div>
+        <div class="soap-value">${escapeHtml(soap.KeyData)}</div>
+        <div class="soap-hint">High-value clinical highlights extracted for KSOAP context.</div>
+      </article>
+    `
+    : "";
 
   const sections = [
     ["Subjective", soap.Subjective, "Patient-reported symptoms, complaints, and history."],
@@ -147,7 +157,7 @@ function formatSoapNote(soapNote) {
     ? `<div class="entity-list"><div class="soap-label">Extracted Entities</div>${entityGroups}</div>`
     : "";
 
-  return `${sections}${entities}`;
+  return `${keyDataBlock}${sections}${entities}`;
 }
 
 function setError(message) {

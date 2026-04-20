@@ -34,14 +34,18 @@ def test_generate_soap_from_sample_summary() -> None:
 
     soap = generate_soap(sample_summary)
 
-    assert set(soap.keys()) == set(expected_soap.keys())
+    assert "SOAP" in soap
+    assert "KSOAP" in soap
+    assert "ExtractedEntities" in soap
     assert set(soap["SOAP"].keys()) == set(expected_soap["SOAP"].keys())
-    assert set(soap["ExtractedEntities"].keys()) == set(expected_soap["ExtractedEntities"].keys())
+    assert set(soap["KSOAP"].keys()) == {"KeyData", "Subjective", "Objective", "Assessment", "Plan"}
+    assert set(soap["ExtractedEntities"].keys()) >= set(expected_soap["ExtractedEntities"].keys())
     assert "headache" in soap["SOAP"]["Subjective"].lower()
     assert "fever" in soap["SOAP"]["Subjective"].lower()
-    assert soap["ExtractedEntities"]["Symptoms"] == expected_soap["ExtractedEntities"]["Symptoms"]
-    assert soap["ExtractedEntities"]["Medicines"] == expected_soap["ExtractedEntities"]["Medicines"]
-    assert soap["ExtractedEntities"]["Conditions"] == expected_soap["ExtractedEntities"]["Conditions"]
+    assert set(soap["ExtractedEntities"]["Symptoms"]) == set(expected_soap["ExtractedEntities"]["Symptoms"])
+    assert soap["ExtractedEntities"]["NegatedSymptoms"] == []
+    assert set(soap["ExtractedEntities"]["Medicines"]) == set(expected_soap["ExtractedEntities"]["Medicines"])
+    assert set(soap["ExtractedEntities"]["Conditions"]) == set(expected_soap["ExtractedEntities"]["Conditions"])
 
 
 def test_speech_to_text_with_sample_audio(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -64,6 +68,7 @@ def test_speech_to_text_with_sample_audio(monkeypatch: pytest.MonkeyPatch, tmp_p
 
     monkeypatch.setattr("backend.services.speech_service.Client", FakeClient)
     monkeypatch.setattr("backend.services.speech_service.settings.gemini_api_key", "test-key")
+    monkeypatch.setattr("backend.services.speech_service.settings.gemini_transcription_model", "gemini-2.5-flash")
 
     transcript = speech_to_text(str(audio_path))
 
@@ -98,3 +103,5 @@ def test_process_endpoint_returns_transcription_summary_and_soap(
     assert payload["soap_note"]["ExtractedEntities"]["Symptoms"]
     assert "transcription_entities" in payload
     assert "turn_count" in payload["transcription_entities"]
+    assert "rag_context" in payload
+    assert "rag_citations" in payload

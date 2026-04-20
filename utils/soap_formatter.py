@@ -1,15 +1,15 @@
-"""SOAP note generation from summarized medical text.
+"""KSOAP note generation from summarized clinical text.
 
-The `generate_soap(summary_text)` function uses a simple rule-based approach
-plus spaCy entity extraction to map symptoms, medicines, and conditions into
-SOAP sections. It returns JSON-ready structured output.
+This module builds a clinically structured note using a rule-based KSOAP
+formatter and returns extracted entities for symptoms, medicines, and
+conditions.
 """
 
 from __future__ import annotations
 
 import re
 from collections import OrderedDict
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import spacy
 from spacy.language import Language
@@ -102,42 +102,101 @@ KEY_MEDICAL_TERMS = {
 }
 
 
-SYMPTOM_KEYWORDS = {
-    "pain",
-    "fever",
-    "cough",
-    "dyspnea",
-    "shortness of breath",
-    "nausea",
-    "vomiting",
-    "headache",
-    "fatigue",
-    "dizziness",
+SYMPTOM_TERMS = {
+    "abdominal pain",
+    "back pain",
+    "body ache",
     "chest pain",
+    "chills",
+    "cough",
+    "diarrhea",
+    "dizziness",
+    "dyspnea",
+    "fatigue",
+    "fever",
+    "headache",
+    "joint pain",
+    "loss of appetite",
+    "nausea",
+    "palpitations",
+    "rash",
+    "runny nose",
+    "shortness of breath",
+    "sore throat",
+    "vomiting",
+    "wheezing",
 }
 
-MEDICINE_KEYWORDS = {
+CONDITION_TERMS = {
+    "allergic rhinitis",
+    "anemia",
+    "asthma",
+    "bronchitis",
+    "copd",
+    "dehydration",
+    "diabetes",
+    "fever",
+    "gastritis",
+    "hypertension",
+    "infection",
+    "migraine",
+    "pneumonia",
+    "sepsis",
+    "sinusitis",
+    "upper respiratory infection",
+    "urinary tract infection",
+    "viral illness",
+}
+
+MEDICATION_TERMS = {
     "acetaminophen",
     "advil",
+    "albuterol",
+    "amlodipine",
     "amoxicillin",
     "aspirin",
+    "atorvastatin",
+    "azithromycin",
+    "cetirizine",
+    "doxycycline",
     "ibuprofen",
     "insulin",
+    "lisinopril",
+    "losartan",
     "metformin",
+    "naproxen",
+    "omeprazole",
+    "ondansetron",
+    "paracetamol",
     "prednisone",
-    "statin",
+    "salbutamol",
     "tylenol",
 }
 
-CONDITION_KEYWORDS = {
-    "asthma",
-    "copd",
-    "diabetes",
-    "fever",
-    "hypertension",
-    "infection",
-    "pneumonia",
-    "sepsis",
+NEGATION_CUES = {
+    "denies",
+    "denied",
+    "no",
+    "without",
+    "negative for",
+}
+
+DOSAGE_PATTERN = re.compile(
+    r"\b([a-z][a-z0-9\-]{2,})\s+\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|units?|iu)\b",
+    re.IGNORECASE,
+)
+
+STOP_MEDICATION_TOKENS = {
+    "blood",
+    "heart",
+    "level",
+    "monitor",
+    "patient",
+    "plan",
+    "reports",
+    "symptoms",
+    "taking",
+    "treatment",
 }
 
 
@@ -173,11 +232,11 @@ def _add_medical_entity_ruler(nlp: Language) -> None:
         ruler = nlp.add_pipe("entity_ruler", name="medical_entity_ruler")
 
     patterns = []
-    for term in sorted(SYMPTOM_KEYWORDS):
+    for term in sorted(SYMPTOM_TERMS):
         patterns.append({"label": "SYMPTOM", "pattern": term})
-    for term in sorted(MEDICINE_KEYWORDS):
+    for term in sorted(MEDICATION_TERMS):
         patterns.append({"label": "MEDICINE", "pattern": term})
-    for term in sorted(CONDITION_KEYWORDS):
+    for term in sorted(CONDITION_TERMS):
         patterns.append({"label": "CONDITION", "pattern": term})
 
     ruler.add_patterns(patterns)
@@ -218,38 +277,82 @@ def _extract_relevant_sentences(sentences: List[str], predicate) -> List[str]:
     return [sentence for sentence in sentences if predicate(sentence)]
 
 
-def _extract_medical_entities(text: str) -> Dict[str, List[str]]:
-    """Extract symptoms, medicines, and conditions with spaCy entities.
+def _contains_negation(sentence: str, term: str) -> bool:
+    lowered = sentence.lower()
+    term_index = lowered.find(term)
+    if term_index < 0:
+        return False
 
-    The entity ruler adds explicit medical labels, which keeps the logic simple
-    and explainable for a beginner-friendly project.
-    """
-    nlp = _load_nlp()
-    doc = nlp(text)
+    window_start = max(0, term_index - 30)
+    context_window = lowered[window_start:term_index]
+    return any(cue in context_window for cue in NEGATION_CUES)
 
-    extracted: Dict[str, List[str]] = {
-        "Symptoms": [],
-        "Medicines": [],
-        "Conditions": [],
-    }
 
-    for ent in doc.ents:
-        value = _dedupe_and_clean(ent.text.lower())
-        if not value:
+def _collect_terms_in_order(text: str, terms: set[str]) -> List[str]:
+    matches: List[Tuple[int, str]] = []
+    for term in terms:
+        pattern = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
+        for m in pattern.finditer(text):
+            matches.append((m.start(), term.lower()))
+    matches.sort(key=lambda item: item[0])
+    return [term for _, term in matches]
+
+
+def _extract_symptoms(text: str, sentences: List[str]) -> Tuple[List[str], List[str]]:
+    positive: List[str] = []
+    negated: List[str] = []
+
+    for term in _collect_terms_in_order(text, SYMPTOM_TERMS):
+        detected_negated = False
+        for sentence in sentences:
+            lowered = sentence.lower()
+            if term in lowered and _contains_negation(sentence, term):
+                detected_negated = True
+                break
+        if detected_negated:
+            negated.append(term)
+        else:
+            positive.append(term)
+
+    return list(OrderedDict.fromkeys(positive)), list(OrderedDict.fromkeys(negated))
+
+
+def _extract_medications(text: str) -> List[str]:
+    found = _collect_terms_in_order(text, MEDICATION_TERMS)
+
+    for match in DOSAGE_PATTERN.finditer(text):
+        token = match.group(1).strip().lower()
+        if token in STOP_MEDICATION_TOKENS:
             continue
+        found.append(token)
 
-        if ent.label_ == "SYMPTOM":
-            extracted["Symptoms"].append(value)
-        elif ent.label_ == "MEDICINE":
-            extracted["Medicines"].append(value)
-        elif ent.label_ == "CONDITION":
-            extracted["Conditions"].append(value)
+    return list(OrderedDict.fromkeys(found))
 
-    # Keep the lists unique while preserving order.
-    for key, values in extracted.items():
-        extracted[key] = list(OrderedDict.fromkeys(values))
 
-    return extracted
+def _extract_conditions(text: str) -> List[str]:
+    found = _collect_terms_in_order(text, CONDITION_TERMS)
+    return list(OrderedDict.fromkeys(found))
+
+
+def _extract_medical_entities(text: str) -> Dict[str, List[str]]:
+    """Extract symptoms, medicines, and conditions with clinical rules.
+
+    The extractor combines lexicon-based phrase matching, dosage-aware
+    medication capture, and simple negation handling for symptom quality.
+    """
+    cleaned_text = normalize_text(text)
+    sentences = _split_sentences(cleaned_text)
+
+    symptoms, negated_symptoms = _extract_symptoms(cleaned_text, sentences)
+    medicines = _extract_medications(cleaned_text)
+    conditions = _extract_conditions(cleaned_text)
+
+    return {
+        "Symptoms": symptoms,
+        "NegatedSymptoms": negated_symptoms,
+        "Medicines": medicines,
+        "Conditions": conditions,
+    }
 
 
 def _fallback_section(sentences: List[str], section_name: str) -> str:
@@ -372,6 +475,49 @@ def _map_to_soap(sentences: List[str], entities: Dict[str, List[str]]) -> Dict[s
     }
 
 
+def _build_key_data(entities: Dict[str, List[str]]) -> str:
+    symptom_text = _join_items(entities.get("Symptoms", [])) or "not clearly documented"
+    medicine_text = _join_items(entities.get("Medicines", [])) or "none documented"
+    condition_text = _join_items(entities.get("Conditions", [])) or "working diagnosis pending"
+    negated = entities.get("NegatedSymptoms", [])
+    negated_text = _join_items(negated)
+
+    segments = [
+        f"Key symptoms: {symptom_text}",
+        f"Current medications: {medicine_text}",
+        f"Clinical conditions: {condition_text}",
+    ]
+    if negated_text:
+        segments.append(f"Symptoms denied: {negated_text}")
+    return "; ".join(segments)
+
+
+def _ensure_section_defaults(soap: Dict[str, str], entities: Dict[str, List[str]]) -> Dict[str, str]:
+    subjective_default = "Patient-reported symptoms are limited in the available transcript."
+    objective_default = "Objective vitals or laboratory data were not explicitly documented."
+    assessment_default = "Clinical impression remains preliminary based on available details."
+    plan_default = "Continue monitoring and follow up with clinician-directed treatment plan."
+
+    if not soap["Subjective"]:
+        symptoms = _join_items(entities.get("Symptoms", []))
+        soap["Subjective"] = (
+            f"Patient-reported symptoms include {symptoms}." if symptoms else subjective_default
+        )
+    if not soap["Objective"]:
+        medicines = _join_items(entities.get("Medicines", []))
+        soap["Objective"] = f"Current documented medications: {medicines}." if medicines else objective_default
+    if not soap["Assessment"]:
+        conditions = _join_items(entities.get("Conditions", []))
+        soap["Assessment"] = (
+            f"Assessment is most consistent with {conditions}." if conditions else assessment_default
+        )
+    if not soap["Plan"]:
+        plan_items = _join_items(entities.get("Medicines", []))
+        soap["Plan"] = f"Continue/consider treatment with {plan_items} and monitor response." if plan_items else plan_default
+
+    return soap
+
+
 def generate_soap(summary_text: str) -> Dict[str, str]:
     """Convert summarized medical text into SOAP format.
 
@@ -384,10 +530,25 @@ def generate_soap(summary_text: str) -> Dict[str, str]:
     cleaned_text = _dedupe_and_clean(summary_text)
     if not cleaned_text:
         return {
-            "Subjective": "",
-            "Objective": "",
-            "Assessment": "",
-            "Plan": "",
+            "KSOAP": {
+                "KeyData": "",
+                "Subjective": "",
+                "Objective": "",
+                "Assessment": "",
+                "Plan": "",
+            },
+            "SOAP": {
+                "Subjective": "",
+                "Objective": "",
+                "Assessment": "",
+                "Plan": "",
+            },
+            "ExtractedEntities": {
+                "Symptoms": [],
+                "NegatedSymptoms": [],
+                "Medicines": [],
+                "Conditions": [],
+            },
         }
 
     sentences = _split_sentences(cleaned_text)
@@ -396,24 +557,25 @@ def generate_soap(summary_text: str) -> Dict[str, str]:
 
     extracted_entities = _extract_medical_entities(cleaned_text)
     soap = _map_to_soap(sentences, extracted_entities)
+    soap = _ensure_section_defaults(soap, extracted_entities)
 
-    # If a section is still empty, use a simple fallback so the output stays
-    # usable even for short or noisy summaries.
-    if not soap["Subjective"]:
-        soap["Subjective"] = _fallback_section(sentences, "Subjective")
-    if not soap["Objective"]:
-        soap["Objective"] = _fallback_section(sentences, "Objective")
-    if not soap["Assessment"]:
-        soap["Assessment"] = _fallback_section(sentences, "Assessment")
-    if not soap["Plan"]:
-        soap["Plan"] = _fallback_section(sentences, "Plan")
+    normalized_soap = {
+        "Subjective": _concise_summary(soap["Subjective"], max_sentences=2),
+        "Objective": _concise_summary(soap["Objective"], max_sentences=2),
+        "Assessment": _concise_summary(soap["Assessment"], max_sentences=2),
+        "Plan": _concise_summary(soap["Plan"], max_sentences=2),
+    }
+
+    ksoap = {
+        "KeyData": _build_key_data(extracted_entities),
+        "Subjective": normalized_soap["Subjective"],
+        "Objective": normalized_soap["Objective"],
+        "Assessment": normalized_soap["Assessment"],
+        "Plan": normalized_soap["Plan"],
+    }
 
     return {
-        "SOAP": {
-            "Subjective": _concise_summary(soap["Subjective"], max_sentences=2),
-            "Objective": _concise_summary(soap["Objective"], max_sentences=2),
-            "Assessment": _concise_summary(soap["Assessment"], max_sentences=2),
-            "Plan": _concise_summary(soap["Plan"], max_sentences=2),
-        },
+        "KSOAP": ksoap,
+        "SOAP": normalized_soap,
         "ExtractedEntities": extracted_entities,
     }

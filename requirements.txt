@@ -8,7 +8,7 @@ nltk
 spacy
 rouge-score
 
-# Google Gemini API for audio-to-text (no FFmpeg needed!)
+# Google Gemini API for audio-to-text
 google-genai
 
 # Common supporting packages for this project

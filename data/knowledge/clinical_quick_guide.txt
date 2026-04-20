@@ -1,0 +1,19 @@
+Clinical Documentation Quick Guide
+
+Fever and cough triage:
+For uncomplicated fever and cough, document duration, associated symptoms, red flags, and hydration status.
+Common plan elements include hydration advice, antipyretics if appropriate, and follow-up if symptoms persist or worsen.
+
+Hypertension follow-up:
+Document medication adherence, home blood pressure trends, adverse effects, and lifestyle factors.
+Typical plan elements include blood pressure monitoring, diet and exercise counseling, and medication adjustment only with clear indication.
+
+Medication documentation:
+Always record medicine name, dose if available, frequency, and patient-reported response.
+When unsure about dose from conversation audio, mark as unspecified rather than inventing values.
+
+SOAP quality reminders:
+Subjective should reflect patient-reported history.
+Objective should include measurable findings when present.
+Assessment should state the most likely clinical impression from available data.
+Plan should be actionable, concise, and aligned with findings.

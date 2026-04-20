@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 MODEL_NAME = "facebook/bart-large-cnn"
 
+SPEAKER_LINE_PATTERN = re.compile(
+    r"^\s*(Doctor|Patient|Nurse|Accompanier|Support Staff|Other):\s*(.+)$",
+    re.IGNORECASE,
+)
+
 
 @lru_cache(maxsize=1)
 def _get_summarizer():
@@ -155,6 +160,110 @@ def _clean_summary(summary: str) -> str:
     return cleaned
 
 
+def _third_personize(text: str) -> str:
+    """Convert common first-person patient phrasing into third-person narrative."""
+    converted = f" {text.strip()} "
+    replacements = [
+        (r"\bI am\b", "the patient is"),
+        (r"\bI'm\b", "the patient is"),
+        (r"\bI have\b", "the patient has"),
+        (r"\bI've had\b", "the patient has had"),
+        (r"\bI had\b", "the patient had"),
+        (r"\bI feel\b", "the patient feels"),
+        (r"\bI felt\b", "the patient felt"),
+        (r"\bI took\b", "the patient took"),
+        (r"\bI was\b", "the patient was"),
+        (r"\bmy\b", "the patient's"),
+        (r"\bme\b", "the patient"),
+        (r"\bI\b", "the patient"),
+    ]
+    for pattern, replacement in replacements:
+        converted = re.sub(pattern, replacement, converted, flags=re.IGNORECASE)
+    return _clean_summary(converted.strip())
+
+
+def _clip_text(text: str, max_words: int = 18) -> str:
+    words = text.split()
+    if len(words) <= max_words:
+        return text
+    return " ".join(words[:max_words]).strip()
+
+
+def summarize_transcript_third_person(transcript_dialogue: str) -> str:
+    """Create a concise third-person summary from speaker-labeled dialogue."""
+    lines = [line.strip() for line in transcript_dialogue.splitlines() if line.strip()]
+    if not lines:
+        return ""
+
+    turns = []
+    for line in lines:
+        match = SPEAKER_LINE_PATTERN.match(line)
+        if not match:
+            continue
+        speaker = match.group(1).lower()
+        utterance = match.group(2).strip()
+        if utterance:
+            turns.append((speaker, utterance))
+
+    if not turns:
+        return _extractive_fallback_summary(transcript_dialogue)
+
+    patient_turns = [u for s, u in turns if s == "patient"]
+    doctor_turns = [u for s, u in turns if s == "doctor"]
+    nurse_turns = [u for s, u in turns if s == "nurse"]
+    accompanier_turns = [u for s, u in turns if s == "accompanier"]
+    support_turns = [u for s, u in turns if s == "support staff"]
+
+    summary_lines: List[str] = []
+
+    if patient_turns:
+        patient_text = _third_personize(" ".join(patient_turns[:2]))
+        summary_lines.append(f"The patient reported that {_clip_text(patient_text)}.")
+
+    if doctor_turns:
+        doctor_text = _clean_summary(" ".join(doctor_turns[:2]))
+        summary_lines.append(f"The doctor discussed evaluation and management, including {_clip_text(doctor_text)}.")
+
+    if nurse_turns:
+        nurse_text = _clean_summary(" ".join(nurse_turns[:1]))
+        summary_lines.append(f"The nurse contributed clinical observations: {_clip_text(nurse_text, max_words=14)}.")
+
+    if accompanier_turns:
+        acc_text = _third_personize(" ".join(accompanier_turns[:1]))
+        summary_lines.append(f"An accompanier added collateral information: {_clip_text(acc_text, max_words=14)}.")
+
+    if support_turns:
+        support_text = _clean_summary(" ".join(support_turns[:1]))
+        summary_lines.append(f"Support staff assisted with logistics: {_clip_text(support_text, max_words=14)}.")
+
+    if not summary_lines:
+        return _extractive_fallback_summary(transcript_dialogue)
+
+    return _clean_summary(" ".join(summary_lines))
+
+
+def _extractive_fallback_summary(text: str, max_sentences: int = 2, max_words: int = 45) -> str:
+    """Return a concise fallback summary when model inference is unavailable.
+
+    This prevents returning the full input/transcription as a pseudo-summary.
+    """
+    sentence_parts = [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+
+    if not sentence_parts:
+        words = text.split()
+        dynamic_limit = min(max_words, max(12, int(len(words) * 0.6)))
+        clipped = " ".join(words[:dynamic_limit]).strip()
+        return _clean_summary(clipped)
+
+    selected = " ".join(sentence_parts[:max_sentences]).strip()
+    words = selected.split()
+    dynamic_limit = min(max_words, max(12, int(len(text.split()) * 0.6)))
+    if len(words) > dynamic_limit:
+        selected = " ".join(words[:dynamic_limit]).strip()
+
+    return _clean_summary(selected)
+
+
 def summarize_text(text: str) -> str:
     """Summarize text using `facebook/bart-large-cnn`.
 
@@ -185,9 +294,18 @@ def summarize_text(text: str) -> str:
 
         final_summary = _clean_summary(" ".join(summaries))
 
+        # Guard against degenerate outputs where model returns near-input text.
+        if not final_summary:
+            return _extractive_fallback_summary(cleaned_text)
+
+        input_words = cleaned_text.split()
+        summary_words = final_summary.split()
+        if len(input_words) > 0 and len(summary_words) >= int(0.9 * len(input_words)):
+            return _extractive_fallback_summary(cleaned_text)
+
         # Keep the final output concise by trimming excess repeated whitespace and
         # returning the first meaningful summary string.
         return final_summary
     except Exception as e:
         logger.error(f"Error during summarization: {e}")
-        return cleaned_text
+        return _extractive_fallback_summary(cleaned_text)

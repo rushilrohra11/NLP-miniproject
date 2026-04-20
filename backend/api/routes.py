@@ -48,6 +48,8 @@ def process_audio(file: UploadFile = File(...)) -> ProcessResponse:
             summary=result["summary"],
             soap_note=result["soap_note"],
             transcription_entities=result.get("transcription_entities"),
+            rag_context=result.get("rag_context"),
+            rag_citations=result.get("rag_citations"),
         )
     except Exception as e:
         logger.error(f"Error processing audio: {str(e)}", exc_info=True)
@@ -76,6 +78,8 @@ def process_text(text: str = Body(..., embed=True)) -> ProcessResponse:
             summary=result["summary"],
             soap_note=result["soap_note"],
             transcription_entities=None,
+            rag_context=result.get("rag_context"),
+            rag_citations=result.get("rag_citations"),
         )
     except Exception as e:
         logger.error(f"Error processing text: {str(e)}", exc_info=True)

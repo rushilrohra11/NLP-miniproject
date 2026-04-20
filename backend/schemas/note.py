@@ -37,3 +37,5 @@ class ProcessResponse(BaseModel):
     summary: str
     soap_note: Dict[str, Any]
     transcription_entities: Dict[str, Any] | None = None
+    rag_context: str | None = None
+    rag_citations: list[Dict[str, Any]] | None = None
